@@ -13,22 +13,9 @@ fin_cols = []
 SOURCE_XLSX = Path(__file__).resolve().parents[1] / "check" / "0MVA_with_持仓状态1.xlsx"
 
 
-def add_factor(df: pd.DataFrame, param=None, **kwargs) -> pd.DataFrame:
-    """先在完整活筹历史上计算均线，再按交易日期对齐，不改变输入行序或索引。
-
-    前周期不足的日期及来源缺失的日期保留 NaN，不填充为零。
-    可通过 source_xlsx 关键字参数指定其他来源文件。
-    """
-    period = 10 if param is None else param
-    if isinstance(period, bool) or not isinstance(period, int) or period <= 0:
-        raise ValueError("活筹MA周期必须为正整数，例如 10")
-
-    col_name = kwargs["col_name"]
-    date_col = "交易日期" if "交易日期" in df.columns else "日期"
-    if date_col not in df.columns:
-        raise KeyError("输入行情缺少交易日期或日期列")
-
-    source_path = Path(kwargs.get("source_xlsx", SOURCE_XLSX))
+def read_active_close(source_xlsx=SOURCE_XLSX) -> pd.Series:
+    """读取同一份活筹收盘历史，供收盘因子与均线因子共用。"""
+    source_path = Path(source_xlsx)
     source = pd.read_excel(source_path, sheet_name="0AMV日线", usecols=["日期", "收盘"])
     dates = source["日期"]
     if pd.api.types.is_numeric_dtype(dates):
@@ -44,8 +31,24 @@ def add_factor(df: pd.DataFrame, param=None, **kwargs) -> pd.DataFrame:
     if source["收盘"].isna().any():
         raise ValueError("活筹数据收盘值存在空值，请先检查来源文件")
     source = source.sort_values("日期").set_index("日期")
-    moving_average = source["收盘"].rolling(window=period, min_periods=period).mean()
+    return source["收盘"]
 
+
+def align_factor(df: pd.DataFrame, values: pd.Series, col_name: str) -> pd.DataFrame:
+    """按日期对齐，缺失日期保留 NaN，不改变输入索引和行序。"""
+    date_col = "交易日期" if "交易日期" in df.columns else "日期"
+    if date_col not in df.columns:
+        raise KeyError("输入行情缺少交易日期或日期列")
     target_dates = pd.to_datetime(df[date_col], errors="raise").dt.normalize()
-    values = moving_average.reindex(pd.DatetimeIndex(target_dates)).to_numpy()
-    return pd.DataFrame({col_name: values}, index=df.index)
+    aligned = values.reindex(pd.DatetimeIndex(target_dates)).to_numpy()
+    return pd.DataFrame({col_name: aligned}, index=df.index)
+
+
+def add_factor(df: pd.DataFrame, param=None, **kwargs) -> pd.DataFrame:
+    """在完整活筹历史上计算均线，前周期不足的日期保留 NaN。"""
+    period = 10 if param is None else param
+    if isinstance(period, bool) or not isinstance(period, int) or period <= 0:
+        raise ValueError("活筹MA周期必须为正整数，例如 10")
+    close = read_active_close(kwargs.get("source_xlsx", SOURCE_XLSX))
+    moving_average = close.rolling(window=period, min_periods=period).mean()
+    return align_factor(df, moving_average, kwargs["col_name"])

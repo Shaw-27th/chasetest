@@ -22,7 +22,8 @@ from core.utils.path_kit import get_folder_path
 # 回测数据的起始时间。如果因子使用滚动计算方法，在回测初期因子值可能为 NaN，实际的首次交易日期可能晚于这个起始时间。󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
 start_date = "2014-01-01"
 # 回测数据的结束时间。可以设为 None，表示使用最新数据；也可以指定具体日期，例如 '2024-11-01'。󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
-end_date = None
+# 活筹原始 Excel 截止到此日，避免用没有活筹指标的后续 ETF 行情生成信号。
+end_date = "2026-08-07"
 # 性能模式，BAL表示均衡，MAX表示快速，ECO表示节能󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
 performance_mode = "MAX"
 # Performance Mode同时会修改 `n_jobs` 和 `factor_col_limit` 的值，不过需要的话，你依旧可以在下面修改它们。󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
@@ -41,7 +42,7 @@ stay_real = True
 # 2️⃣ 数据配置󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
 # ====================================================================================================󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
 # 数据中心的文件夹，使用数据客户端，并订阅相关数据，就不需要再手动指定每一个必要数据󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
-data_center_path = Path(r"D:\stock_data")
+data_center_path = Path(__file__).resolve().parent
 runtime_data_path = get_folder_path("data")  # 回测结果存放的的文件夹，默认为项目文件夹下的 data 文件夹，可以自定义󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
 
 # 数据源的定义，如果不使用数据客户端的时候，可以手动自定义以下逐个数据源󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
@@ -78,16 +79,17 @@ fin_data_path = data_center_path / "stock-fin-data-xbx"
 #     },
 #     "cap_weight": 1,
 # }
-backtest_name = "活跃市值4测试"
+backtest_name = "活筹MA10择时测试"
 strategy = {
     "code": "sh512100",
     "code_type": "etf",
     "rebalance_time": "open",
     "timing": {
-        "name": "活跃市值4",
+        "name": "活筹MA择时",
         "factor_list": [
-            # 直接读取 0MVA_with_持仓状态1.xlsx 的"持仓状态1"列
-            ("持仓状态1", 1, None, 1),
+            # 两个指标均来自 check 下的活筹 Excel，不使用 ETF 收盘价判断。
+            ("活筹收盘", 1, None, 1),
+            ("活筹MA", 1, 10, 1),
         ],
         "params": {},
     },
