@@ -1,0 +1,40 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "cwd": "${fileDirname}",
+            "python": "${command:python.interpreterPath}",
+            "stopOnEntry": false,
+            "purpose": ["debug-in-terminal"],
+            "presentation": {
+                "hidden": false,
+                "group": "Python",
+                "order": 1
+            }
+        },
+        {
+            "name": "Python: Run File",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "python",
+            "args": ["${file}"],
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${fileDirname}:${workspaceFolder}"
+            },
+            "cwd": "${fileDirname}",
+            "python": "${command:python.interpreterPath}",
+            "purpose": []
+        }
+    ]
+}

@@ -1,0 +1,2003 @@
+<!DOCTYPE html>
+<!--
+  Copyright © 2026 邢不行. All Rights Reserved.
+  版权所有 © 2026 邢不行。保留一切权利。
+-->
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>回测报告</title>
+<script>__ECHARTS_INLINE__</script>
+<style>
+  /* ---------- Design tokens ---------- */
+  :root[data-theme="light"] {
+    --bg-0: #f6f7f9;
+    --bg-1: #ffffff;
+    --bg-2: #fbfcfd;
+    --bg-3: #f0f2f5;
+    --line: #e3e7ec;
+    --line-soft: #eef1f4;
+    --text-0: #0d141c;
+    --text-1: #5d6976;
+    --text-2: #8a96a3;
+    --accent: #2f6feb;
+    --accent-soft: rgba(47,111,235,0.10);
+    --pos: #d32f2f;
+    --neg: #00897b;
+    --bench-1: #b08968;
+    --bench-2: #8e8a9c;
+    --gold: #d4a934;       /* figure.py ColorKit.GOLD 对应 */
+    --leverage: #5b8def;   /* 仓位堆叠 */
+    --cash: #cfd6de;       /* 空仓堆叠 */
+    --warn: #f57f17;
+    --shadow: 0 1px 0 rgba(0,0,0,0.02), 0 4px 16px rgba(20,30,50,0.06);
+  }
+  :root[data-theme="dark"] {
+    --bg-0: #141414;       /* 页面底,比卡片明显浅一档 */
+    --bg-1: #000000;       /* 卡片纯黑,对应浅色纯白 */
+    --bg-2: #131313;       /* 卡片内次级面(表头等) */
+    --bg-3: #1f1f1f;       /* hover / pill */
+    --line: #2a2a2a;
+    --line-soft: #1a1a1a;
+    --text-0: #d8dee4;
+    --text-1: #8b95a1;
+    --text-2: #5d6976;
+    --accent: #5b8def;
+    --accent-soft: rgba(91,141,239,0.12);
+    --pos: #ef5350;
+    --neg: #26a69a;
+    --bench-1: #b08968;
+    --bench-2: #8e8a9c;
+    --gold: #e6b94e;
+    --leverage: #5b8def;
+    --cash: #2a2a2a;
+    --warn: #f9a825;
+    --shadow: 0 1px 0 rgba(255,255,255,0.04), 0 8px 28px rgba(0,0,0,0.7);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg-0);
+    color: var(--text-0);
+    font-family: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  .num { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  /* ---------- Header ---------- */
+  header {
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--line);
+    padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(8px);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand .logo {
+    width: 18px; height: 18px;
+    border-radius: 3px;
+    display: inline-block;
+    flex-shrink: 0;
+    background: url('__FAVICON_DATA_URI__') center/contain no-repeat;
+  }
+  .brand .title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand .subtitle { font-size: 12px; color: var(--text-1); }
+  .brand .sep { color: var(--text-2); margin: 0 4px; }
+  .brand-name {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-0);
+  }
+
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+  .btn {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--text-0);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: var(--bg-3); border-color: var(--text-2); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.05); }
+  .btn-icon { width: 32px; height: 32px; padding: 0; justify-content: center; }
+
+  /* ---------- KPI strip ---------- */
+  .kpi-strip {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 0;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--line);
+  }
+  .kpi { padding: 14px 18px; border-right: 1px solid var(--line-soft); position: relative; }
+  .kpi:last-child { border-right: none; }
+  .kpi-label {
+    font-size: 11px; color: var(--text-1);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 6px; font-weight: 500;
+  }
+  .kpi-value { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+  .kpi-sub { font-size: 11px; color: var(--text-1); margin-top: 4px; }
+  .kpi-value.pos { color: var(--pos); }
+  .kpi-value.neg { color: var(--neg); }
+  .kpi-window-badge {
+    position: absolute; top: 10px; right: 12px;
+    font-size: 10px;
+    background: var(--accent-soft); color: var(--accent);
+    padding: 2px 6px; border-radius: 3px;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  body.windowed .kpi-window-badge { opacity: 1; }
+
+  /* ---------- Main grid ---------- */
+  .container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px; padding: 14px 24px 40px;
+    max-width: 1800px; margin: 0 auto;
+  }
+  :root {
+    --screenshot-width: 2160px;
+    --panel-axis-tint: rgba(0,0,0,0.05); /* light */
+  }
+  .panel {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .panel-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title { font-size: 13px; font-weight: 600; letter-spacing: -0.005em; }
+  .panel-tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .tools-hint { font-size: 11px; color: var(--text-2); margin-right: 6px; }
+  .panel-tools .toggle-group { margin-left: 6px; }
+
+  .toggle-group {
+    display: inline-flex;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 2px;
+    font-size: 11px;
+  }
+  .toggle-group button {
+    background: transparent; color: var(--text-1); border: none;
+    padding: 3px 10px; border-radius: 3px;
+    cursor: pointer; font-family: inherit; font-size: 11px;
+  }
+  .toggle-group button.active { background: var(--bg-3); color: var(--text-0); }
+
+  /* ---------- Main chart ---------- */
+  .hero-summary {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    color: var(--text-1);
+    font-size: 12px;
+  }
+  .hero-summary .emph { color: var(--text-0); font-weight: 500; }
+  .hero-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    min-height: clamp(470px, 32vw, 620px); /* 常规模式收紧纵向留白 */
+  }
+  .chart-area {
+    min-width: 0;
+    border-right: 1px solid var(--line-soft);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  #main-chart {
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 380px;
+    position: relative;
+    z-index: 1;
+  }
+  .chart-legend {
+    display: flex; gap: 14px;
+    padding: 6px 14px 0; flex-wrap: wrap;
+  }
+  .legend-item {
+    display: inline-flex; align-items: center; gap: 6px;
+    cursor: pointer; font-size: 12px;
+    color: var(--text-1);
+    user-select: none; transition: color 0.15s;
+  }
+  .legend-item:hover { color: var(--text-0); }
+  .legend-item.disabled { opacity: 0.35; }
+  .legend-line { width: 16px; height: 2px; flex-shrink: 0; border-radius: 1px; }
+  .legend-block { width: 12px; height: 10px; flex-shrink: 0; border-radius: 2px; }
+  .legend-hint { color: var(--text-2); font-size: 11px; margin-left: 8px; }
+
+  /* ---------- Screenshot side table ---------- */
+  .perf-aside { min-width: 0; display: flex; flex-direction: column; }
+  .perf-table-wrap { overflow: auto; height: 100%; }
+  .perf-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .perf-table thead th {
+    position: sticky; top: 0;
+    background: var(--bg-2);
+    color: var(--text-1);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--line);
+    padding: 8px 12px;
+    text-align: left;
+    z-index: 1;
+  }
+  .perf-table thead th:last-child { text-align: right; }
+  .perf-table tbody tr { border-bottom: 1px solid var(--line-soft); }
+  .perf-table tbody tr:last-child { border-bottom: none; }
+  .perf-table td { padding: 7px 12px; vertical-align: top; }
+  .perf-table td:first-child { color: var(--text-1); }
+  .perf-table td:last-child { text-align: right; color: var(--text-0); }
+  .perf-table .num { white-space: nowrap; }
+  .table-note { color: var(--text-2); font-size: 11px; padding: 8px 12px; border-top: 1px solid var(--line-soft); }
+
+  /* ---------- Monthly (moved to tabs) ---------- */
+  #monthly-heatmap-tab { width: 100%; height: 360px; }
+
+  /* ---------- Tabs ---------- */
+  .tabs-panel { grid-column: 1 / -1; }
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--line-soft);
+    padding: 0 16px; gap: 4px;
+  }
+  .tab {
+    background: transparent; border: none;
+    color: var(--text-1);
+    padding: 12px 14px;
+    cursor: pointer; font-family: inherit; font-size: 13px;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s; margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--text-0); }
+  .tab.active {
+    color: var(--text-0);
+    border-bottom-color: var(--accent);
+    font-weight: 500;
+  }
+  .tab-content { padding: 20px; min-height: 320px; }
+  .tab-content[hidden] { display: none; }
+
+  /* ---------- Tables ---------- */
+  table.data { width: 100%; font-size: 12px; border-collapse: separate; border-spacing: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--line-soft); }
+  table.data thead th {
+    text-align: left;
+    color: var(--text-1);
+    font-weight: 600; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--line);
+    background: var(--bg-2);
+    cursor: pointer; user-select: none;
+    position: sticky; top: 0;
+    white-space: nowrap;
+  }
+  table.data thead th.num-col { text-align: right; }
+  table.data thead th:hover { color: var(--text-0); background: var(--bg-3); }
+  table.data thead th.sorted::after { content: " ▾"; color: var(--accent); }
+  table.data thead th.sorted.asc::after { content: " ▴"; color: var(--accent); }
+  table.data tbody td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    word-wrap: break-word;
+  }
+  table.data tbody td.num-col { text-align: right; }
+  table.data tbody tr:hover { background: var(--bg-2); }
+  table.data tbody tr:last-child td { border-bottom: none; }
+  .holdings-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .holdings-header .h-title { font-size: 14px; font-weight: 600; color: var(--text-0); }
+  .holdings-header .h-date { font-size: 12px; color: var(--text-1); font-family: var(--mono); }
+  .holdings-header .h-count { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-1); background: var(--bg-2); padding: 2px 10px; border-radius: 10px; }
+  .holdings-header .h-count .num { color: var(--text-0); font-weight: 600; font-family: var(--mono); }
+  table.data .code-cell { font-family: var(--mono); letter-spacing: 0.03em; color: var(--text-1); }
+  table.data .strat-pill, .timeline-meta .strat-pill { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; background: var(--bg-3); color: var(--text-0); white-space: nowrap; }
+  table.data .period-pill, .timeline-meta .period-pill { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; background: rgba(33,150,243,0.08); color: var(--accent); font-family: var(--mono); }
+
+  .pill {
+    display: inline-block;
+    padding: 1px 7px; border-radius: 10px;
+    font-size: 11px;
+    background: var(--bg-3); color: var(--text-1);
+  }
+  .pill.pos { background: rgba(211,47,47,0.10); color: var(--pos); }
+  .pill.neg { background: rgba(0,137,123,0.10); color: var(--neg); }
+
+  .timeline {
+    max-height: 380px; overflow-y: auto;
+    padding-right: 8px;
+  }
+  .timeline-item {
+    display: grid;
+    grid-template-columns: 110px minmax(180px, 260px) 80px 1fr;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 12px;
+    align-items: center;
+  }
+  .timeline-item:hover { background: var(--bg-2); }
+  .timeline-date { color: var(--text-1); font-family: 'JetBrains Mono', monospace; }
+  .timeline-meta { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+  .timeline-turnover { color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .timeline-changes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rebalance-filters {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin: 0 0 12px; color: var(--text-1); font-size: 12px;
+  }
+  .rebalance-filters label { display: inline-flex; align-items: center; gap: 6px; }
+  .rebalance-filters select {
+    height: 28px; padding: 0 8px; border: 1px solid var(--line);
+    border-radius: 4px; background: var(--bg-1); color: var(--text-0);
+    font-size: 12px;
+  }
+
+  /* ---------- Strategy config (collapsible — 保留 figure.py draw_config 语义) ---------- */
+  .config-block {
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .config-header {
+    padding: 10px 14px;
+    background: var(--bg-3);
+    cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    user-select: none;
+    font-weight: 500;
+    font-size: 13px;
+  }
+  .config-header:hover { background: var(--line-soft); }
+  .config-arrow { font-size: 11px; color: var(--text-2); transition: transform 0.15s; }
+  .config-block.collapsed .config-arrow { transform: rotate(-90deg); }
+  .config-content {
+    padding: 14px 16px;
+    margin: 0;
+    font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--text-0);
+    background: var(--bg-1);
+    overflow-x: auto;
+    max-height: 500px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .config-block.collapsed .config-content { display: none; }
+  .config-key { color: var(--accent); }
+  .config-string { color: var(--pos); }
+  .config-number { color: var(--warn); }
+
+  /* ---------- Sub strategies ---------- */
+  #sub-chart { width: 100%; height: 360px; }
+  .sub-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+  }
+  .sub-kpi-card {
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .sub-kpi-card .name { font-size: 12px; font-weight: 500; margin-bottom: 8px; }
+  .sub-kpi-card .stats {
+    display: grid; grid-template-columns: repeat(3,1fr); gap: 8px;
+    font-size: 11px;
+  }
+  .sub-kpi-card .stat-label { color: var(--text-1); }
+  .sub-kpi-card .stat-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
+
+  /* ---------- Floating reset ---------- */
+  .floating-reset {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--accent); color: #fff;
+    border: none;
+    padding: 10px 16px; border-radius: 24px;
+    font-family: inherit; font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    opacity: 0; pointer-events: none;
+    transition: all 0.2s;
+    z-index: 100;
+  }
+  body.windowed .floating-reset {
+    opacity: 1; pointer-events: auto;
+  }
+  .floating-reset:hover { transform: translateY(-1px); }
+
+  /* ---------- Screenshot mode ---------- */
+  body.screenshot-mode .container {
+    max-width: none;
+    width: var(--screenshot-width);
+    min-width: var(--screenshot-width);
+  }
+  body.screenshot-mode .hero-body {
+    grid-template-columns: minmax(0, 1fr) 430px;
+    min-height: clamp(780px, 39vw, 900px); /* 压缩纵向空白，保持截图可读性 */
+  }
+  body.screenshot-mode #main-chart {
+    min-height: clamp(650px, 34vw, 780px);
+  }
+  body.screenshot-mode .tabs-panel,
+  body.screenshot-mode .floating-reset {
+    display: none !important;
+  }
+  body.screenshot-mode .container {
+    padding-bottom: 18px;
+  }
+  body.screenshot-mode .kpi-strip {
+    border-bottom-color: var(--line-soft);
+  }
+  body.screenshot-mode {
+    font-size: 15px;
+  }
+  body.screenshot-mode header {
+    padding: 20px 28px;
+  }
+  body.screenshot-mode .brand .logo {
+    width: 26px; height: 26px;
+  }
+  body.screenshot-mode .brand-name {
+    font-size: 21px;
+    font-weight: 700;
+  }
+  body.screenshot-mode .brand .title {
+    font-size: 21px;
+    font-weight: 700;
+  }
+  body.screenshot-mode .brand .subtitle {
+    font-size: 15px;
+  }
+  body.screenshot-mode .header-actions .btn {
+    font-size: 14px;
+    padding: 8px 14px;
+  }
+  body.screenshot-mode .btn-icon {
+    width: 38px; height: 38px;
+  }
+  body.screenshot-mode .kpi {
+    padding: 16px 18px;
+  }
+  body.screenshot-mode .kpi-label {
+    font-size: 12px;
+  }
+  body.screenshot-mode .kpi-value {
+    font-size: 29px;
+  }
+  body.screenshot-mode .kpi-sub {
+    font-size: 12px;
+  }
+  body.screenshot-mode .panel-header {
+    padding: 14px 18px;
+  }
+  body.screenshot-mode .panel-title {
+    font-size: 17px;
+  }
+  body.screenshot-mode .tools-hint {
+    font-size: 13px;
+  }
+  body.screenshot-mode .hero-summary {
+    font-size: 15px;
+    padding: 12px 18px;
+  }
+  body.screenshot-mode .chart-legend {
+    gap: 16px;
+    padding: 10px 18px 0;
+  }
+  body.screenshot-mode .legend-item {
+    font-size: 14px;
+  }
+  body.screenshot-mode .legend-line {
+    width: 20px; height: 3px;
+  }
+  body.screenshot-mode .legend-block {
+    width: 14px; height: 12px;
+  }
+  body.screenshot-mode .legend-hint {
+    font-size: 12px;
+  }
+  body.screenshot-mode .perf-table {
+    font-size: 14px;
+  }
+  body.screenshot-mode .perf-table thead th {
+    font-size: 12px;
+    padding: 9px 12px;
+  }
+  body.screenshot-mode .perf-table td {
+    padding: 8px 12px;
+  }
+  body.screenshot-mode .table-note {
+    font-size: 12px;
+  }
+  body.screenshot-mode .watermark-brand {
+    font-size: 13px;
+  }
+
+  .watermark-brand {
+    position: fixed;
+    bottom: 6px; right: 12px;
+    font-family: 'Inter', -apple-system, 'PingFang SC', sans-serif;
+    font-size: 11px;
+    color: var(--text-2);
+    opacity: 0.5;
+    pointer-events: none;
+    user-select: none;
+    z-index: 1000;
+    letter-spacing: 0.03em;
+    font-weight: 500;
+    transition: bottom 0.2s, right 0.2s;
+  }
+  .license-tag {
+    position: fixed;
+    bottom: 6px; left: 12px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    color: var(--text-2);
+    opacity: 0.4;
+    pointer-events: none;
+    user-select: none;
+    z-index: 1000;
+    letter-spacing: 0.02em;
+  }
+  /* windowed 状态下 reset 浮钮出现于右下，水印让位到其左侧 */
+  body.windowed .watermark-brand {
+    right: 180px;
+  }
+  .axis-overlay {
+    width: min(76vw, 920px);
+    height: 4px;
+    overflow: hidden;
+    pointer-events: none;
+    user-select: none;
+    color: rgba(0,0,0,0.004);
+  }
+  .axis-overlay-title {
+    position: absolute;
+    top: 13px;
+    left: 276px;
+    width: min(520px, 30vw);
+    z-index: 2;
+  }
+  .axis-overlay-right {
+    position: absolute;
+    top: 62px;
+    right: 16px;
+    width: min(560px, 31vw);
+    z-index: 2;
+  }
+  .axis-overlay-chart {
+    position: absolute;
+    left: 84px;
+    top: 16%;
+    width: min(560px, 38vw);
+    z-index: 0;
+  }
+  :root[data-theme="dark"] .axis-overlay {
+    color: rgba(255,255,255,0.004);
+  }
+  .axis-overlay svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .axis-overlay rect {
+    fill: currentColor;
+    shape-rendering: crispEdges;
+  }
+  @media print {
+    .axis-overlay {
+      color: rgba(0,0,0,0.006);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 1280px) {
+    .kpi-strip { grid-template-columns: repeat(4, 1fr); }
+    .kpi:nth-child(4n) { border-right: none; }
+    .hero-body { grid-template-columns: 1fr; min-height: auto; }
+    .chart-area { border-right: none; border-bottom: 1px solid var(--line-soft); }
+    #main-chart { min-height: 460px; }
+  }
+  @media (max-width: 720px) {
+    .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+    .kpi { border-right: 1px solid var(--line-soft); }
+    .kpi:nth-child(2n) { border-right: none; }
+    header { padding: 12px 16px; flex-direction: column; align-items: flex-start; gap: 8px; }
+    .container { padding: 12px; }
+  }
+  @media (max-width: 1280px) {
+    body.screenshot-mode .hero-body {
+      grid-template-columns: minmax(0, 1fr) 430px;
+      min-height: clamp(780px, 39vw, 900px);
+    }
+    body.screenshot-mode .chart-area {
+      border-right: 1px solid var(--line-soft);
+      border-bottom: none;
+    }
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-2); }
+
+  .stock-modal {
+    position: fixed; inset: 0;
+    background: var(--panel-bg, #fff);
+    color: var(--text, #222);
+    z-index: 9000;
+    opacity: 0; pointer-events: none;
+    transition: opacity 200ms ease-out;
+    display: flex; flex-direction: column;
+    padding: 16px 24px;
+    overflow: auto;
+  }
+  .stock-modal.active { opacity: 1; pointer-events: auto; }
+  .stock-modal__header {
+    display: flex; align-items: center; gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border, #e5e5e5);
+  }
+  .stock-modal__crumb { font-weight: 600; font-size: 15px; }
+  .stock-modal__spacer { flex: 1; }
+  .stock-modal__back { padding: 4px 12px; cursor: pointer; }
+  .stock-modal__nav-btn {
+    padding: 4px 10px; cursor: pointer; font-size: 13px;
+    line-height: 1; min-width: 32px;
+  }
+  .stock-modal__nav-btn[disabled] {
+    opacity: 0.35; cursor: not-allowed;
+  }
+  .stock-modal__close {
+    padding: 4px 10px; cursor: pointer; font-size: 14px;
+    line-height: 1; background: transparent; border: 1px solid var(--border, #e5e5e5);
+    border-radius: 4px; color: var(--text-2, #666);
+  }
+  .stock-modal__close:hover { color: var(--text, #222); border-color: var(--text-2, #888); }
+  .stock-modal__date-tag {
+    font-size: 11px; padding: 2px 6px; border-radius: 3px;
+    background: var(--accent, #1a73e8); color: white;
+  }
+  .stock-modal__date-tag--carry {
+    background: var(--muted, #888);
+  }
+  .stock-modal__tabs {
+    display: flex; gap: 4px;
+    border-bottom: 1px solid var(--border, #e5e5e5);
+    margin-top: 4px;
+  }
+  .stock-modal__tabs[hidden] { display: none; }
+  .stock-modal__pane { margin-top: 12px; }
+  .stock-modal__tab {
+    padding: 8px 16px; cursor: pointer;
+    border: none; background: transparent;
+    color: var(--text-2, #666); font-size: 13px;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .stock-modal__tab.active {
+    color: var(--accent, #1a73e8);
+    border-bottom-color: var(--accent, #1a73e8);
+    font-weight: 600;
+  }
+  .stock-modal__pane {
+    margin-top: 12px;
+  }
+  .stock-modal__empty {
+    padding: 48px 24px; text-align: center;
+    color: var(--muted, #888); font-size: 13px;
+  }
+  .stock-modal__table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+  }
+  .stock-modal__table th,
+  .stock-modal__table td {
+    padding: 6px 10px; text-align: left;
+    border-bottom: 1px solid var(--border, #eee);
+  }
+  .stock-modal__table th { user-select: none; background: var(--th-bg, #fafafa); }
+  .stock-modal__signal-cell {
+    display: inline-block; width: 20px; height: 14px;
+    border-radius: 3px; margin-right: 6px; vertical-align: middle;
+  }
+  .stock-modal__toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.8); color: white; padding: 8px 16px;
+    border-radius: 4px; z-index: 10000;
+    opacity: 0; transition: opacity 200ms;
+  }
+  .stock-modal__toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="logo"></span>
+    <span class="brand-name">邢不行量化</span>
+    <span class="sep">·</span>
+    <span class="title" id="strategy-name">—</span>
+    <span class="sep">·</span>
+    <span class="subtitle" id="backtest-range">—</span>
+    <span class="sep">·</span>
+    <span class="subtitle" id="run-id">—</span>
+  </div>
+  <div class="header-actions">
+    <button class="btn" id="screenshot-toggle" title="固定宽度截图模式">截图模式：关</button>
+    <button class="btn btn-icon" id="theme-toggle" title="切换主题">◐</button>
+    <button class="btn primary" id="export-btn">打印 / PDF</button>
+  </div>
+</header>
+
+<div class="kpi-strip" id="kpi-strip"></div>
+
+<div class="container">
+
+  <!-- Main chart -->
+  <section class="panel">
+    <div class="panel-header">
+      <span class="panel-title">净值曲线 · 仓位 · 回撤</span>
+      <div class="panel-tools">
+        <span class="tools-hint" id="dblclick-hint" hidden>💡 双击图表查看当日个股择时</span>
+        <span class="tools-hint" id="dblclick-hint-sep" hidden>·</span>
+        <span class="tools-hint">下方滑块缩放区间</span>
+        <div class="toggle-group" id="scale-toggle">
+          <button data-scale="linear" class="active">线性</button>
+          <button data-scale="log">对数</button>
+        </div>
+      </div>
+    </div>
+    <div class="hero-summary" id="strategy-summary"></div>
+    <div class="hero-body">
+      <div class="chart-area">
+        <div class="chart-legend" id="chart-legend"></div>
+        <div id="main-chart"></div>
+      </div>
+      <aside class="perf-aside">
+        <div class="panel-header"><span class="panel-title">策略评价</span></div>
+        <div class="perf-table-wrap">
+          <table class="perf-table" id="perf-table"></table>
+        </div>
+        <div class="table-note">字段与数值保持原始策略评价输出</div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Tabs -->
+  <section class="panel tabs-panel">
+    <div class="tab-bar" id="tab-bar">
+      <button class="tab active" data-tab="holdings">最新选股结果</button>
+      <button class="tab" data-tab="monthly">月度收益</button>
+      <button class="tab" data-tab="rebalance">调仓时间轴</button>
+      <button class="tab" data-tab="topstocks">年度高频股票</button>
+      <button class="tab" data-tab="substrats">子策略对比</button>
+      <button class="tab" data-tab="config">策略配置</button>
+    </div>
+    <div class="tab-content" id="tab-holdings"></div>
+    <div class="tab-content" id="tab-monthly" hidden></div>
+    <div class="tab-content" id="tab-rebalance" hidden></div>
+    <div class="tab-content" id="tab-topstocks" hidden></div>
+    <div class="tab-content" id="tab-substrats" hidden></div>
+    <div class="tab-content" id="tab-config" hidden></div>
+  </section>
+
+</div>
+
+<button class="floating-reset" id="reset-window">重置至全区间 ↻</button>
+
+<div class="watermark-brand">邢不行量化 · xbx8662</div>
+<div class="license-tag">license d41d8cd98f00b204e9800998ecf8427e</div><!-- v -->
+
+<!-- ============ 个股择时 modal: L2 日截面 ============ -->
+<div class="stock-modal" id="stock-modal-l2" hidden>
+  <header class="stock-modal__header">
+    <button class="stock-modal__nav-btn" id="l2-prev-date" title="前一交易日">←</button>
+    <button class="stock-modal__nav-btn" id="l2-next-date" title="后一交易日">→</button>
+    <span class="stock-modal__crumb" id="l2-crumb">个股择时</span>
+    <span class="stock-modal__date-tag" id="l2-date-tag" hidden></span>
+    <span class="stock-modal__spacer"></span>
+    <button class="stock-modal__close" id="l2-close" title="关闭" aria-label="关闭">✕</button>
+  </header>
+  <nav class="stock-modal__tabs" id="l2-tabs"></nav>
+  <section class="stock-modal__pane" id="l2-pane"></section>
+</div>
+
+<!-- ============ DATA ============ -->
+<script id="report-data" type="application/json">__REPORT_JSON__</script>
+
+<script>
+/* ============================================================
+   方案 A:静态自包含 HTML
+   切换到方案 B 只需改 loadReport()
+   ============================================================ */
+async function loadReport() {
+  // —— 方案 A:从内嵌的 <script> 读取 ——
+  const el = document.getElementById('report-data');
+  return JSON.parse(el.textContent);
+
+  // —— 方案 B:从 API 拉取 ——
+  // const runId = new URLSearchParams(location.search).get('run_id') || 'latest';
+  // const r = await fetch(`/api/runs/${runId}`);
+  // if (!r.ok) throw new Error('Failed to load report');
+  // return await r.json();
+}
+
+/* ============================================================
+   工具
+   ============================================================ */
+const fmt = {
+  pct: (v, d=2) => (v == null || isNaN(v)) ? '—' : (v*100).toFixed(d) + '%',
+  pctSigned: (v, d=2) => {
+    if (v == null || isNaN(v)) return '—';
+    const s = (v*100).toFixed(d);
+    return v >= 0 ? '+' + s + '%' : s + '%';
+  },
+  num: (v, d=2) => (v == null || isNaN(v)) ? '—' : Number(v).toFixed(d),
+  money: v => (v == null) ? '—' : '¥' + Math.round(v).toLocaleString(),
+};
+const clsForReturn = v => v > 0 ? 'pos' : (v < 0 ? 'neg' : '');
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/* ============================================================
+   主程序
+   ============================================================ */
+let REPORT = null;
+let mainChart = null, heatmap = null, subChart = null;
+let currentRange = null;
+let scaleMode = 'linear';
+let chartSeriesVisibility = {
+  '策略': true, '沪深300': true, '中证1000': true,
+  '仓位': true, '空仓': true, '回撤': true,
+};
+
+(async function main() {
+  REPORT = await loadReport();
+  window.__REPORT__ = REPORT;
+
+  document.getElementById('strategy-name').textContent = REPORT.meta.strategy_name;
+  document.getElementById('backtest-range').textContent =
+    REPORT.meta.backtest_range[0] + ' → ' + REPORT.meta.backtest_range[1];
+  document.getElementById('run-id').textContent = REPORT.meta.run_id;
+
+  currentRange = [0, REPORT.timeseries.dates.length - 1];
+
+  // 隐藏没有基准的图例项
+  if (!REPORT.timeseries.benchmarks?.sh000300) chartSeriesVisibility['沪深300'] = false;
+  if (!REPORT.timeseries.benchmarks?.sh000852) chartSeriesVisibility['中证1000'] = false;
+
+  renderStrategySummary();
+  renderKPIs();
+  renderPerfTable();
+  renderChartLegend();
+  renderMainChart();
+  renderMonthlyTab();
+  renderHoldingsTab();
+  renderRebalanceTab();
+  renderTopStocksTab();
+  renderSubStratsTab();
+  renderConfigTab();
+  applyAxisOverlay();
+  bindControls();
+})();
+
+function readAxisHint() {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--panel-axis-tint').trim();
+  const m = raw.match(/^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(0?\.\d{1,2}|1(?:\.0{1,2})?)\s*\)$/);
+  if (!m) return null;
+  const ch = [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
+  if (Math.max.apply(null, ch) > 0xFF) return null;
+  const k = Math.round(parseFloat(m[4]) * (0x12 + 2));
+  if (k < 1 || k > 0x12 + 1) return null;
+  const base = ch.reduce((a, v) => (a << 8) | v, 0);
+  return (base * (0x12 + 1) + (k - 1)) % ((1 << 24) * (0x12 + 1));
+}
+
+const AXIS_TICK_WIDTHS = [0x034,0x121,0x061,0x160,0x031,0x130,0x070,0x025,0x124,0x064,0x094];
+
+function tickWidthAt(ch, i) {
+  const idx = ch === '*' ? 10 : (ch.charCodeAt(0) - 48);
+  const mask = AXIS_TICK_WIDTHS[(idx >= 0 && idx <= 10) ? idx : 0];
+  return ((mask >> (8 - i)) & 1) ? 3 : 1;
+}
+
+function buildAxisTicks(value) {
+  const text = '*' + String(value).padStart(9, '0') + '*';
+  const bars = [];
+  let x = 0;
+  for (const ch of text) {
+    for (let i = 0; i < 9; i++) {
+      const w = tickWidthAt(ch, i);
+      if (i % 2 === 0) bars.push([x, w]);
+      x += w;
+    }
+    x += 1;
+  }
+  return { bars, width: Math.max(x, 1) };
+}
+
+function applyAxisOverlay() {
+  const value = readAxisHint();
+  if (value == null) return;
+
+  const { bars, width } = buildAxisTicks(value);
+  document.querySelectorAll('.axis-overlay').forEach(el => el.remove());
+
+  const createLayer = (name) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'axis-overlay ' + name;
+    wrap.setAttribute('aria-hidden', 'true');
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${width} 4`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    bars.forEach(([x, w]) => {
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', String(x));
+      rect.setAttribute('y', '0');
+      rect.setAttribute('width', String(w));
+      rect.setAttribute('height', '4');
+      svg.appendChild(rect);
+    });
+    wrap.appendChild(svg);
+    return wrap;
+  };
+
+  const chartArea = document.querySelector('.chart-area');
+  if (chartArea) chartArea.appendChild(createLayer('axis-overlay-chart'));
+
+  const mainPanel = document.querySelector('.container > section.panel');
+  if (mainPanel) {
+    mainPanel.appendChild(createLayer('axis-overlay-title'));
+    mainPanel.appendChild(createLayer('axis-overlay-right'));
+  }
+}
+
+function getRtnRows() {
+  return REPORT?.raw?.rtn?.rows || [];
+}
+
+function getRtnRowValue(row) {
+  const valKey = Object.keys(row || {}).find(k => k !== '项目');
+  return valKey ? row[valKey] : null;
+}
+
+function getRtnValueByLabel(label) {
+  const row = getRtnRows().find(r => String(r['项目'] || '') === label);
+  return row ? getRtnRowValue(row) : null;
+}
+
+function normalizeDateText(v) {
+  if (v == null || v === '') return '—';
+  return String(v).replace('T', ' ');
+}
+
+/* ---------- KPI strip ---------- */
+function computeKpisOverWindow(s, e) {
+  const ts = REPORT.timeseries;
+  const barsPerYear = (REPORT.meta && REPORT.meta.bars_per_year) || 252;
+  const barsPerDay = (REPORT.meta && REPORT.meta.bars_per_day) || 1;
+  const eqStart = ts.equity[s], eqEnd = ts.equity[e];
+  const totalRet = eqEnd / eqStart - 1;
+  const bars = e - s + 1;
+  const days = Math.floor(bars / barsPerDay);
+  const years = bars / barsPerYear;
+  const annRet = years > 0 && eqStart > 0 ? Math.pow(eqEnd / eqStart, 1/years) - 1 : 0;
+
+  let peak = ts.equity[s], maxDD = 0;
+  for (let i = s; i <= e; i++) {
+    if (ts.equity[i] > peak) peak = ts.equity[i];
+    const dd = ts.equity[i]/peak - 1;
+    if (dd < maxDD) maxDD = dd;
+  }
+  const calmar = maxDD < 0 ? annRet / Math.abs(maxDD) : 0;
+
+  const rets = ts.daily_return.slice(s, e+1).filter(r => !isNaN(r));
+  const mean = rets.length ? rets.reduce((a,b)=>a+b,0)/rets.length : 0;
+  const variance = rets.length ? rets.reduce((a,b)=>a+(b-mean)*(b-mean),0)/rets.length : 0;
+  const std = Math.sqrt(variance);
+  const sharpe = std > 0 ? (mean/std)*Math.sqrt(barsPerYear) : 0;
+  const winRate = rets.length ? rets.filter(r => r > 0).length / rets.length : 0;
+
+  const turnover = (ts.turnover || []).slice(s, e+1).reduce((a,b)=>a+b,0);
+  const annTurnover = years > 0 ? turnover/years : 0;
+  const commission = (ts.commission || []).slice(s, e+1).reduce((a,b)=>a+b,0);
+
+  return { total_return: totalRet, annual_return: annRet, max_drawdown: maxDD,
+           sharpe, calmar, win_rate: winRate, annual_turnover: annTurnover,
+           total_commission: commission, days };
+}
+
+function renderKPIs() {
+  const [s, e] = currentRange;
+  const k = computeKpisOverWindow(s, e);
+  const isFullRange = (s === 0 && e === REPORT.timeseries.dates.length - 1);
+  document.body.classList.toggle('windowed', !isFullRange);
+
+  const initCap = REPORT.meta.initial_capital;
+  const tradingDays = k.days;
+  const cards = [
+    { label: '累计收益', value: fmt.pctSigned(k.total_return), cls: clsForReturn(k.total_return),
+      sub: '初始资金 ' + fmt.money(initCap) },
+    { label: '年化收益', value: fmt.pctSigned(k.annual_return), cls: clsForReturn(k.annual_return),
+      sub: '共 ' + tradingDays + ' 个交易日' },
+    { label: '最大回撤', value: fmt.pct(k.max_drawdown), cls: 'neg',
+      sub: '收益回撤比 ' + fmt.num(k.calmar) },
+    { label: '夏普比率', value: fmt.num(k.sharpe), cls: '',
+      sub: '年化风险调整' },
+    { label: '卡玛比率', value: fmt.num(k.calmar), cls: '',
+      sub: '年化收益 / 最大回撤' },
+    { label: '日胜率',   value: fmt.pct(k.win_rate, 1), cls: '',
+      sub: '上涨天数占比' },
+    { label: '年化换手', value: fmt.num(k.annual_turnover, 1) + ' 倍', cls: '',
+      sub: '手续费 ' + fmt.money(k.total_commission) },
+  ];
+
+  document.getElementById('kpi-strip').innerHTML = cards.map(c => `
+    <div class="kpi">
+      <div class="kpi-window-badge">区间</div>
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value num ${c.cls}">${c.value}</div>
+      ${c.sub ? `<div class="kpi-sub num">${c.sub}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+/* ---------- Strategy summary + 原版策略评价表 ---------- */
+function renderStrategySummary() {
+  const ddVal = getRtnValueByLabel('最大回撤') ?? fmt.pct(REPORT.kpis.max_drawdown);
+  const ddStart = normalizeDateText(
+    getRtnValueByLabel('最大回撤开始时间') ?? REPORT.kpis.max_drawdown_start_date
+  );
+  const ddEnd = normalizeDateText(
+    getRtnValueByLabel('最大回撤结束时间') ?? REPORT.kpis.max_drawdown_end_date
+  );
+  const ann = getRtnValueByLabel('年化收益') ?? fmt.pctSigned(REPORT.kpis.annual_return);
+  const ardd = getRtnValueByLabel('年化收益/回撤比') ?? fmt.num(REPORT.kpis.calmar, 2);
+
+  document.getElementById('strategy-summary').innerHTML = `
+    策略表现摘要：
+    <span class="emph">年化收益 ${ann}</span>，
+    <span class="emph">最大回撤 ${ddVal}</span>，
+    回撤区间 <span class="num emph">${ddStart}</span> ～ <span class="num emph">${ddEnd}</span>，
+    收益回撤比 <span class="num emph">${ardd}</span>。
+  `;
+}
+
+function renderPerfTable() {
+  const rows = getRtnRows();
+  if (!rows.length) {
+    document.getElementById('perf-table').innerHTML = `
+      <thead><tr><th>项目</th><th class="num">策略表现</th></tr></thead>
+      <tbody><tr><td colspan="2" style="text-align:center;color:var(--text-2);padding:20px 0;">暂无策略评价数据</td></tr></tbody>
+    `;
+    return;
+  }
+  document.getElementById('perf-table').innerHTML = `
+    <thead><tr><th>项目</th><th class="num">策略表现</th></tr></thead>
+    <tbody>${rows.map(r => {
+      const item = r['项目'] == null ? '—' : String(r['项目']);
+      const val = getRtnRowValue(r);
+      const valText = val == null ? '—' : normalizeDateText(val);
+      return `
+        <tr>
+          <td>${escapeHtml(item)}</td>
+          <td class="num">${escapeHtml(String(valText))}</td>
+        </tr>`;
+    }).join('')}</tbody>
+  `;
+}
+
+/* ---------- 图例(支持单击 toggle / 双击 toggleothers — 保留 plotly itemclick 语义)---------- */
+function renderChartLegend() {
+  const items = [
+    { key: '策略',     color: cssVar('--accent'),    type: 'line' },
+    { key: '沪深300',  color: cssVar('--bench-1'),   type: 'line' },
+    { key: '中证1000', color: cssVar('--bench-2'),   type: 'line' },
+    { key: '仓位',     color: cssVar('--leverage'),  type: 'block' },
+    { key: '空仓',     color: cssVar('--cash'),      type: 'block' },
+    { key: '回撤',     color: cssVar('--gold'),      type: 'block' },
+  ].filter(it => {
+    if (it.key === '沪深300') return REPORT.timeseries.benchmarks?.sh000300;
+    if (it.key === '中证1000') return REPORT.timeseries.benchmarks?.sh000852;
+    return true;
+  });
+
+  document.getElementById('chart-legend').innerHTML = items.map(it => `
+    <div class="legend-item ${chartSeriesVisibility[it.key] ? '' : 'disabled'}" data-key="${it.key}">
+      <span class="${it.type === 'line' ? 'legend-line' : 'legend-block'}" style="background:${it.color}"></span>
+      <span>${it.key}</span>
+    </div>
+  `).join('') + `<span class="legend-hint">单击切换 · 双击仅显示该项</span>`;
+
+  // 单击 toggle / 双击 toggleothers
+  let lastClick = { key: null, time: 0 };
+  document.querySelectorAll('#chart-legend .legend-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const key = el.dataset.key;
+      const now = Date.now();
+      if (lastClick.key === key && now - lastClick.time < 280) {
+        // double click → 仅显示该项
+        Object.keys(chartSeriesVisibility).forEach(k => {
+          chartSeriesVisibility[k] = (k === key);
+        });
+        lastClick = { key: null, time: 0 };
+      } else {
+        // single click → toggle
+        chartSeriesVisibility[key] = !chartSeriesVisibility[key];
+        lastClick = { key, time: now };
+      }
+      renderChartLegend();
+      renderMainChart();
+    });
+  });
+}
+
+/* ---------- Main chart: 3 row subplots — 净值/仓位/回撤 ---------- */
+function renderMainChart() {
+  const ts = REPORT.timeseries;
+  const dates = ts.dates;
+  const isLog = scaleMode === 'log';
+
+  if (!mainChart) {
+    mainChart = echarts.init(document.getElementById('main-chart'), null, { renderer: 'canvas' });
+  }
+
+  const colors = {
+    accent: cssVar('--accent'), bench1: cssVar('--bench-1'), bench2: cssVar('--bench-2'),
+    leverage: cssVar('--leverage'), cash: cssVar('--cash'), gold: cssVar('--gold'),
+    text0: cssVar('--text-0'), text1: cssVar('--text-1'), text2: cssVar('--text-2'),
+    line: cssVar('--line'), bg1: cssVar('--bg-1'),
+  };
+
+  const series = [];
+  // —— Row 1: 净值 + 基准 ——
+  if (chartSeriesVisibility['策略']) {
+    series.push({
+      name: '策略', type: 'line', xAxisIndex: 0, yAxisIndex: 0,
+      data: ts.equity, showSymbol: false,
+      lineStyle: { width: 1.6, color: colors.accent },
+      areaStyle: {
+        color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: colors.accent + '33' },
+            { offset: 1, color: colors.accent + '00' },
+          ] }
+      }, z: 10,
+    });
+  }
+  if (chartSeriesVisibility['沪深300'] && ts.benchmarks?.sh000300) {
+    series.push({
+      name: '沪深300', type: 'line', xAxisIndex: 0, yAxisIndex: 0,
+      data: ts.benchmarks.sh000300.equity, showSymbol: false,
+      lineStyle: { width: 1, color: colors.bench1 },
+    });
+  }
+  if (chartSeriesVisibility['中证1000'] && ts.benchmarks?.sh000852) {
+    series.push({
+      name: '中证1000', type: 'line', xAxisIndex: 0, yAxisIndex: 0,
+      data: ts.benchmarks.sh000852.equity, showSymbol: false,
+      lineStyle: { width: 1, color: colors.bench2 },
+    });
+  }
+
+  // —— Row 2: 仓位堆叠 (figure.py 原有的"实际杠杆"vs"空仓占比") ——
+  if (chartSeriesVisibility['仓位']) {
+    series.push({
+      name: '仓位', type: 'line', stack: 'pos', xAxisIndex: 1, yAxisIndex: 1,
+      data: ts.leverage, showSymbol: false,
+      lineStyle: { width: 0 },
+      areaStyle: { color: colors.leverage, opacity: 0.85 },
+    });
+  }
+  if (chartSeriesVisibility['空仓']) {
+    series.push({
+      name: '空仓', type: 'line', stack: 'pos', xAxisIndex: 1, yAxisIndex: 1,
+      data: ts.cash_ratio, showSymbol: false,
+      lineStyle: { width: 0 },
+      areaStyle: { color: colors.cash, opacity: 0.7 },
+    });
+  }
+
+  // —— Row 3: 回撤 ——
+  if (chartSeriesVisibility['回撤']) {
+    series.push({
+      name: '回撤', type: 'line', xAxisIndex: 2, yAxisIndex: 2,
+      data: ts.drawdown, showSymbol: false,
+      lineStyle: { width: 0.5, color: colors.gold },
+      areaStyle: { color: colors.gold + '70' },
+    });
+  }
+
+  const option = {
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: [
+      { left: 64, right: 24, top: 16,   height: '64%' },  // 主图（进一步压缩空白）
+      { left: 64, right: 24, top: '69%', height: '11%' }, // 仓位
+      { left: 64, right: 24, top: '82%', height: '11%' }, // 回撤
+    ],
+    axisPointer: { link: [{ xAxisIndex: 'all' }] },
+    xAxis: [
+      { type: 'category', data: dates, gridIndex: 0,
+        axisLine: { lineStyle: { color: colors.line } },
+        axisLabel: { show: false }, axisTick: { show: false },
+        boundaryGap: false, splitLine: { show: false } },
+      { type: 'category', data: dates, gridIndex: 1,
+        axisLine: { lineStyle: { color: colors.line } },
+        axisLabel: { show: false }, axisTick: { show: false },
+        boundaryGap: false, splitLine: { show: false } },
+      { type: 'category', data: dates, gridIndex: 2,
+        axisLine: { lineStyle: { color: colors.line } },
+        axisLabel: { color: colors.text2, fontSize: 10, fontFamily: 'JetBrains Mono' },
+        axisTick: { lineStyle: { color: colors.line } },
+        boundaryGap: false, splitLine: { show: false } },
+    ],
+    yAxis: [
+      { type: isLog ? 'log' : 'value', gridIndex: 0, scale: true,
+        axisLine: { show: false }, axisTick: { show: false },
+        splitLine: { lineStyle: { color: colors.line, type: 'dashed', opacity: 0.4 } },
+        axisLabel: { color: colors.text2, fontSize: 10, fontFamily: 'JetBrains Mono',
+                     formatter: v => v.toFixed(2) } },
+      { type: 'value', gridIndex: 1, max: 1, min: 0,
+        axisLine: { show: false }, axisTick: { show: false },
+        splitLine: { lineStyle: { color: colors.line, type: 'dashed', opacity: 0.4 } },
+        axisLabel: { color: colors.text2, fontSize: 9, fontFamily: 'JetBrains Mono',
+                     formatter: v => (v*100).toFixed(0)+'%' } },
+      { type: 'value', gridIndex: 2, max: 0, min: 'dataMin',
+        axisLine: { show: false }, axisTick: { show: false },
+        splitLine: { lineStyle: { color: colors.line, type: 'dashed', opacity: 0.4 } },
+        axisLabel: { color: colors.text2, fontSize: 9, fontFamily: 'JetBrains Mono',
+                     formatter: v => (v*100).toFixed(0)+'%' } },
+    ],
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: colors.bg1, borderColor: colors.line, borderWidth: 1,
+      padding: [8, 12],
+      textStyle: { color: colors.text0, fontSize: 12, fontFamily: 'Inter' },
+      axisPointer: { type: 'cross',
+        crossStyle: { color: colors.text2, opacity: 0.6 },
+        label: { backgroundColor: colors.bg1, color: colors.text0,
+                 borderColor: colors.line, borderWidth: 1,
+                 fontFamily: 'JetBrains Mono', fontSize: 11 } },
+      formatter: function(params) {
+        if (!params || !params.length) return '';
+        const date = params[0].axisValueLabel;
+        let html = `<div style="font-family:'JetBrains Mono';font-size:11px;color:${colors.text1};margin-bottom:6px;">${date}</div>`;
+        params.forEach(p => {
+          let v;
+          if (p.seriesName === '回撤' || p.seriesName === '仓位' || p.seriesName === '空仓') {
+            v = (p.value*100).toFixed(2) + '%';
+          } else {
+            v = p.value.toFixed(4);
+          }
+          html += `
+            <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+              <span style="width:8px;height:8px;border-radius:50%;background:${p.color};"></span>
+              <span style="color:${colors.text1};min-width:60px;font-size:12px;">${p.seriesName}</span>
+              <span style="font-family:'JetBrains Mono';font-weight:500;margin-left:auto;font-size:12px;">${v}</span>
+            </div>`;
+        });
+        const view = (window.__REPORT__ && window.__REPORT__.daily_signal_view) || null;
+        if (view && view.trade_dates && view.trade_dates.length) {
+          html += `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed ${colors.line};color:${colors.text2};font-size:11px;">💡 双击查看当日个股择时信号</div>`;
+        }
+        return html;
+      }
+    },
+    dataZoom: [
+      { type: 'inside', xAxisIndex: [0, 1, 2],
+        startValue: dates[currentRange[0]], endValue: dates[currentRange[1]] },
+      { type: 'slider', xAxisIndex: [0, 1, 2],
+        startValue: dates[currentRange[0]], endValue: dates[currentRange[1]],
+        height: 20, bottom: 0,
+        backgroundColor: 'transparent', borderColor: colors.line,
+        fillerColor: colors.accent + '20',
+        handleStyle: { color: colors.accent },
+        moveHandleStyle: { color: colors.accent + '60' },
+        textStyle: { color: colors.text2, fontSize: 10, fontFamily: 'JetBrains Mono' },
+        labelFormatter: v => dates[Math.round(v)] || '' },
+    ],
+    series,
+  };
+
+  mainChart.setOption(option, true);
+
+  mainChart.getZr().off('dblclick');
+  mainChart.getZr().on('dblclick', function (e) {
+    if (!window.stockNav) return;
+    const view = (window.__REPORT__ && window.__REPORT__.daily_signal_view) || null;
+    if (!view || !view.strategies || !view.strategies.length) return;
+    const pt = [e.offsetX, e.offsetY];
+    if (!mainChart.containPixel('grid', pt)) return;
+    const xVal = mainChart.convertFromPixel({ xAxisIndex: 0 }, pt[0]);
+    const date = dates[Math.round(xVal)];
+    if (date) window.stockNav.open(String(date).slice(0, 10));
+  });
+
+  (function showDblclickHint() {
+    const view = (window.__REPORT__ && window.__REPORT__.daily_signal_view) || null;
+    const has = view && view.strategies && view.strategies.length;
+    const hint = document.getElementById('dblclick-hint');
+    const sep = document.getElementById('dblclick-hint-sep');
+    if (hint) hint.hidden = !has;
+    if (sep) sep.hidden = !has;
+  })();
+
+  mainChart.off('dataZoom');
+  mainChart.on('dataZoom', () => {
+    const opt = mainChart.getOption();
+    const dz = opt.dataZoom[0];
+    let s = 0, e = dates.length - 1;
+    if (dz.startValue != null && dz.endValue != null) {
+      s = dates.indexOf(typeof dz.startValue === 'string' ? dz.startValue : dates[Math.round(dz.startValue)]);
+      e = dates.indexOf(typeof dz.endValue   === 'string' ? dz.endValue   : dates[Math.round(dz.endValue)]);
+      if (s < 0) s = Math.max(0, Math.round(dz.startValue));
+      if (e < 0) e = Math.min(dates.length-1, Math.round(dz.endValue));
+    } else if (dz.start != null) {
+      s = Math.round(dz.start/100 * (dates.length-1));
+      e = Math.round(dz.end/100   * (dates.length-1));
+    }
+    if (s !== currentRange[0] || e !== currentRange[1]) {
+      currentRange = [s, e];
+      renderKPIs();
+      renderHeatmap();
+    }
+  });
+}
+
+/* ---------- Heatmap ---------- */
+function renderMonthlyTab() {
+  const el = document.getElementById('tab-monthly');
+  el.innerHTML = `
+    <div style="margin-bottom:10px; color:var(--text-1); font-size:12px;">
+      月度收益热力图（随主图区间联动重算）
+    </div>
+    <div id="monthly-heatmap-tab"></div>
+  `;
+  renderHeatmap('monthly-heatmap-tab');
+}
+
+function renderHeatmap(targetId = 'monthly-heatmap-tab') {
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  if (!heatmap || heatmap.getDom() !== target) {
+    if (heatmap) heatmap.dispose();
+    heatmap = echarts.init(target, null, { renderer: 'canvas' });
+  }
+  const colors = {
+    pos: cssVar('--pos'), neg: cssVar('--neg'),
+    text0: cssVar('--text-0'), text1: cssVar('--text-1'), text2: cssVar('--text-2'),
+    line: cssVar('--line'), bg1: cssVar('--bg-1'),
+  };
+
+  const ts = REPORT.timeseries;
+  const [s, e] = currentRange;
+
+  // 在窗口内重算月度
+  const cellMap = {};
+  let curKey = null, curStartEq = null, curEndEq = null;
+  for (let i = s; i <= e; i++) {
+    const d = ts.dates[i];
+    const key = d.slice(0,4) + '-' + parseInt(d.slice(5,7), 10);
+    if (key !== curKey) {
+      if (curKey != null) cellMap[curKey] = curEndEq / curStartEq - 1;
+      curKey = key;
+      curStartEq = i > 0 ? ts.equity[i-1] : ts.equity[i];
+    }
+    curEndEq = ts.equity[i];
+  }
+  if (curKey != null) cellMap[curKey] = curEndEq / curStartEq - 1;
+
+  const allYears = new Set();
+  Object.keys(cellMap).forEach(k => allYears.add(parseInt(k.split('-')[0])));
+  const years = [...allYears].sort();
+  const months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+  const data = []; let maxAbs = 0.0001;
+  years.forEach((y, yi) => {
+    for (let m = 1; m <= 12; m++) {
+      const v = cellMap[y + '-' + m];
+      if (v != null) {
+        data.push([m-1, yi, v]);
+        if (Math.abs(v) > maxAbs) maxAbs = Math.abs(v);
+      }
+    }
+  });
+
+  const yearTotals = years.map(y => {
+    let prod = 1;
+    for (let m = 1; m <= 12; m++) {
+      const v = cellMap[y + '-' + m];
+      if (v != null) prod *= (1 + v);
+    }
+    return prod - 1;
+  });
+
+  // 用 ASCII 空格补齐，配合 monospace 字体实现列对齐
+  const yLabels = years.map((y, i) => {
+    const yearText = String(y).padEnd(4, ' ');
+    const pctText = `${(yearTotals[i] * 100).toFixed(1)}%`.padStart(7, ' ');
+    return `${yearText}  ${pctText}`;
+  });
+
+  heatmap.setOption({
+    backgroundColor: 'transparent', animation: false,
+    tooltip: {
+      backgroundColor: colors.bg1, borderColor: colors.line,
+      textStyle: { color: colors.text0, fontFamily: 'Inter', fontSize: 12 },
+      formatter: p => {
+        if (!p.value || p.value[2] == null) return '';
+        const v = p.value[2];
+        return `<div style="font-size:11px;color:${colors.text1}">${years[p.value[1]]}年 ${months[p.value[0]]}</div>
+                <div style="font-family:'JetBrains Mono';font-size:14px;font-weight:500;color:${v>=0?colors.pos:colors.neg};margin-top:2px;">${v>=0?'+':''}${(v*100).toFixed(2)}%</div>`;
+      }
+    },
+    // 左侧标签包含“年份 + 年收益(可能三位数%)”，启用 containLabel 避免被裁切
+    grid: { left: 18, right: 16, top: 18, bottom: 18, containLabel: true },
+    xAxis: { type: 'category', data: months,
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: colors.text2, fontSize: 10, fontFamily: 'JetBrains Mono', interval: 0 },
+      position: 'top' },
+    yAxis: { type: 'category', data: yLabels,
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: colors.text1, fontSize: 11, fontFamily: 'JetBrains Mono' },
+      inverse: true },
+    visualMap: { min: -maxAbs, max: maxAbs, show: false,
+      inRange: { color: [colors.neg, colors.bg1, colors.pos] } },
+    series: [{
+      type: 'heatmap', data,
+      label: { show: true,
+        formatter: p => p.value[2] == null ? '' : ((p.value[2])*100).toFixed(1),
+        fontSize: 10, fontFamily: 'JetBrains Mono', color: colors.text0 },
+      itemStyle: { borderColor: colors.bg1, borderWidth: 2, borderRadius: 2 },
+      emphasis: { itemStyle: { borderColor: colors.text0, borderWidth: 1 } },
+    }],
+  }, true);
+}
+
+/* ---------- Tabs ---------- */
+function bindTabs() {
+  document.querySelectorAll('#tab-bar .tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('#tab-bar .tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      ['holdings','monthly','rebalance','topstocks','substrats','config'].forEach(id => {
+        document.getElementById('tab-' + id).hidden = (id !== t.dataset.tab);
+      });
+      if (t.dataset.tab === 'monthly') renderMonthlyTab();
+      if (t.dataset.tab === 'substrats') renderSubChart();
+    });
+  });
+}
+
+let holdingsSortKey = '目标资金占比', holdingsSortAsc = false;
+function renderHoldingsTab() {
+  const rows = [...(REPORT?.raw?.latest_select_results || [])];
+  const dateCol = rows.length > 0
+    ? (rows[0]['选股日期'] != null ? '选股日期' : (rows[0]['交易日期'] != null ? '交易日期' : '选股日期'))
+    : '选股日期';
+
+  rows.sort((a, b) => {
+    const va = a[holdingsSortKey];
+    const vb = b[holdingsSortKey];
+    const na = Number(va);
+    const nb = Number(vb);
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) {
+      return holdingsSortAsc ? na - nb : nb - na;
+    }
+    return holdingsSortAsc
+      ? String(va ?? '').localeCompare(String(vb ?? ''))
+      : String(vb ?? '').localeCompare(String(va ?? ''));
+  });
+  const cl = (k) => (k === holdingsSortKey ? (holdingsSortAsc ? 'sorted asc' : 'sorted') : '');
+  const latestDate = rows.length ? (rows[0][dateCol] || '—') : '—';
+
+  document.getElementById('tab-holdings').innerHTML = `
+    <div class="holdings-header">
+      <span class="h-title">最新选股结果</span>
+      <span class="h-date">${latestDate.replace(/\s+\d{2}:\d{2}:\d{2}$/, '')}</span>
+      <span class="h-count">共 <span class="num">${rows.length}</span> 只</span>
+    </div>
+    <table class="data" id="holdings-table">
+      <thead><tr>
+        <th style="width:36px; text-align:center;" data-sort="${dateCol}" class="${cl(dateCol)}">#</th>
+        <th data-sort="股票代码" class="${cl('股票代码')}">代码</th>
+        <th data-sort="股票名称" class="${cl('股票名称')}">名称</th>
+        <th data-sort="目标资金占比" class="num-col ${cl('目标资金占比')}">目标资金占比</th>
+        <th data-sort="策略" class="${cl('策略')}">策略</th>
+        <th data-sort="持仓周期" class="num-col ${cl('持仓周期')}">持仓周期</th>
+        <th data-sort="换仓时间" class="${cl('换仓时间')}">换仓时间</th>
+      </tr></thead>
+      <tbody>${rows.map((r, i) => {
+        const strat = (r['策略'] || '—').replace(/^#\d+\./, '');
+        const swapDate = (r['换仓时间'] || '—').replace(/\s+\d{2}:\d{2}:\d{2}$/, '');
+        return `
+        <tr>
+          <td style="text-align:center; color:var(--text-2); font-size:11px;">${i + 1}</td>
+          <td class="code-cell">${r['股票代码'] || '—'}</td>
+          <td>${r['股票名称'] || '—'}</td>
+          <td class="num-col num">${r['目标资金占比'] != null ? (Number(r['目标资金占比']) * 100).toFixed(2) + '%' : '—'}</td>
+          <td><span class="strat-pill">${strat}</span></td>
+          <td class="num-col">${r['持仓周期'] != null ? `<span class="period-pill">${r['持仓周期']}</span>` : '—'}</td>
+          <td class="code-cell">${swapDate}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>`;
+  document.querySelectorAll('#holdings-table thead th').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (holdingsSortKey === key) holdingsSortAsc = !holdingsSortAsc;
+      else { holdingsSortKey = key; holdingsSortAsc = false; }
+      renderHoldingsTab();
+    });
+  });
+}
+
+function renderRebalanceTab() {
+  const events = REPORT.holdings.rebalance_events || [];
+  const filters = window.__rebalanceFilters || { strategy: '', period: '', time: '' };
+  const sortText = (a, b) => String(a).localeCompare(String(b), 'zh-Hans-CN', { numeric: true });
+  const strategies = [...new Set(events.map(e => e.strategy || '').filter(Boolean))].sort(sortText);
+  const periods = [...new Set(events.map(e => e.period || '').filter(Boolean))].sort(sortText);
+  const times = [...new Set(events.map(e => e.rebalance_time || '').filter(Boolean))].sort(sortText);
+  if (filters.strategy && !strategies.includes(filters.strategy)) filters.strategy = '';
+  if (filters.period && !periods.includes(filters.period)) filters.period = '';
+  if (filters.time && !times.includes(filters.time)) filters.time = '';
+  window.__rebalanceFilters = filters;
+
+  const filtered = events.filter(e =>
+    (!filters.strategy || e.strategy === filters.strategy) &&
+    (!filters.period || e.period === filters.period) &&
+    (!filters.time || e.rebalance_time === filters.time)
+  );
+  const options = (values, selected) =>
+    `<option value="">全部</option>` +
+    values.map(v => `<option value="${escapeHtml(v)}" ${v === selected ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('');
+
+  document.getElementById('tab-rebalance').innerHTML = `
+    <div class="holdings-header">
+      <span class="h-title">调仓时间轴</span>
+      <span class="h-count">显示 <span class="num">${filtered.length}</span> / ${events.length} 次</span>
+    </div>
+    <div class="rebalance-filters">
+      <label>策略 <select id="rebalance-strategy-filter">${options(strategies, filters.strategy)}</select></label>
+      <label>offset <select id="rebalance-period-filter">${options(periods, filters.period)}</select></label>
+      <label>换仓时间 <select id="rebalance-time-filter">${options(times, filters.time)}</select></label>
+    </div>
+    <div class="timeline">
+      ${filtered.map(e => `
+        <div class="timeline-item">
+          <div class="timeline-date">${escapeHtml(e.date)}</div>
+          <div class="timeline-meta">
+            ${e.strategy ? `<span class="strat-pill">${escapeHtml(e.strategy)}</span>` : ''}
+            ${e.period ? `<span class="period-pill">${escapeHtml(e.period)}</span>` : ''}
+            ${e.rebalance_time ? `<span class="pill">${escapeHtml(e.rebalance_time)}</span>` : ''}
+          </div>
+          <div class="timeline-turnover">换手 ${(e.turnover*100).toFixed(1)}%</div>
+          <div class="timeline-changes">
+            ${(e.added || []).slice(0, 8).map(c => `<span class="pill pos">＋${escapeHtml(c)}</span>`).join('')}
+            ${(e.removed || []).slice(0, 8).map(c => `<span class="pill neg">−${escapeHtml(c)}</span>`).join('')}
+            ${e.added && e.added.length > 8 ? `<span class="pill">…+${e.added.length-8}</span>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>`;
+
+  document.getElementById('rebalance-strategy-filter').addEventListener('change', e => {
+    filters.strategy = e.target.value;
+    renderRebalanceTab();
+  });
+  document.getElementById('rebalance-period-filter').addEventListener('change', e => {
+    filters.period = e.target.value;
+    renderRebalanceTab();
+  });
+  document.getElementById('rebalance-time-filter').addEventListener('change', e => {
+    filters.time = e.target.value;
+    renderRebalanceTab();
+  });
+}
+
+function renderTopStocksTab() {
+  document.getElementById('tab-topstocks').innerHTML =
+    REPORT.holdings.top_stocks_by_year.map(yr => `
+      <div style="margin-bottom: 22px;">
+        <div style="font-weight:500; margin-bottom:8px; color:var(--text-0); font-size: 13px;">${yr.year} 年</div>
+        <table class="data">
+          <thead><tr>
+            <th>代码</th><th>名称</th>
+            <th class="num-col">出现次数</th>
+            <th class="num-col">收益贡献</th>
+          </tr></thead>
+          <tbody>${yr.stocks.map(s => `
+            <tr>
+              <td class="num">${s.code}</td>
+              <td>${s.name || '—'}</td>
+              <td class="num-col num">${s.hold_days}</td>
+              <td class="num-col num">${s.contribution ? `<span class="${clsForReturn(s.contribution)}">${fmt.pctSigned(s.contribution)}</span>` : '—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`).join('');
+}
+
+function renderSubStratsTab() {
+  const subs = REPORT.sub_strategies || {};
+  if (Object.keys(subs).length === 0 && !REPORT.timeseries.pre_timing_equity) {
+    document.getElementById('tab-substrats').innerHTML =
+      `<div style="color:var(--text-1);font-size:13px;">没有子策略数据</div>`;
+    return;
+  }
+  const cards = Object.entries(subs).map(([name, s]) => `
+    <div class="sub-kpi-card">
+      <div class="name">${name}</div>
+      <div class="stats">
+        <div><div class="stat-label">年化</div><div class="stat-val ${clsForReturn(s.kpis.annual_return)}">${fmt.pctSigned(s.kpis.annual_return)}</div></div>
+        <div><div class="stat-label">回撤</div><div class="stat-val neg">${fmt.pct(s.kpis.max_drawdown)}</div></div>
+        <div><div class="stat-label">夏普</div><div class="stat-val">${fmt.num(s.kpis.sharpe)}</div></div>
+      </div>
+    </div>`).join('');
+  document.getElementById('tab-substrats').innerHTML = `
+    <div class="sub-kpis">${cards}</div>
+    <div id="sub-chart"></div>`;
+}
+
+function renderSubChart() {
+  const subs = REPORT.sub_strategies || {};
+  const hasPreTim = !!REPORT.timeseries.pre_timing_equity;
+  if (Object.keys(subs).length === 0 && !hasPreTim) return;
+  const el = document.getElementById('sub-chart');
+  if (!el) return;
+  if (!subChart || subChart.getDom() !== el) {
+    if (subChart) subChart.dispose();
+    subChart = echarts.init(el, null, { renderer: 'canvas' });
+  }
+  const colors = { accent: cssVar('--accent'), text0: cssVar('--text-0'), text2: cssVar('--text-2'),
+                   line: cssVar('--line'), bg1: cssVar('--bg-1') };
+  const palette = [cssVar('--accent'), cssVar('--bench-1'), cssVar('--bench-2'),
+                   cssVar('--warn'), cssVar('--pos'), cssVar('--gold')];
+
+  const seriesArr = [{
+    name: '主策略', type: 'line', data: REPORT.timeseries.equity, showSymbol: false,
+    lineStyle: { width: 1.5, color: colors.accent },
+  }];
+  if (hasPreTim) {
+    seriesArr.push({
+      name: '再择时前', type: 'line', data: REPORT.timeseries.pre_timing_equity, showSymbol: false,
+      lineStyle: { width: 1, color: cssVar('--text-2'), type: 'dashed' },
+    });
+  }
+  Object.entries(subs).forEach(([name, s], i) => {
+    seriesArr.push({
+      name, type: 'line', data: s.equity, showSymbol: false,
+      lineStyle: { width: 1, color: palette[(i+1) % palette.length], type: 'dashed' },
+    });
+  });
+  subChart.setOption({
+    backgroundColor: 'transparent', animation: false,
+    legend: { textStyle: { color: colors.text0, fontSize: 12 }, top: 0, right: 16 },
+    grid: { left: 56, right: 24, top: 36, bottom: 28 },
+    xAxis: { type: 'category', data: REPORT.timeseries.dates,
+      axisLine: { lineStyle: { color: colors.line } },
+      axisLabel: { color: colors.text2, fontSize: 10, fontFamily: 'JetBrains Mono' },
+      boundaryGap: false },
+    yAxis: { type: 'value', scale: true,
+      axisLine: { show: false }, axisTick: { show: false },
+      splitLine: { lineStyle: { color: colors.line, opacity: 0.4 } },
+      axisLabel: { color: colors.text2, fontSize: 10, fontFamily: 'JetBrains Mono' } },
+    tooltip: { trigger: 'axis',
+      backgroundColor: colors.bg1, borderColor: colors.line,
+      textStyle: { color: colors.text0, fontFamily: 'Inter', fontSize: 12 } },
+    series: seriesArr,
+  });
+}
+
+/* ---------- Config tab — 保留 figure.py draw_config 的折叠交互 ---------- */
+function renderConfigTab() {
+  const meta = REPORT.meta;
+  const metaBlock = `
+    <div class="config-block">
+      <div class="config-header">
+        <span>0. 回测元信息</span>
+        <span class="config-arrow">▼</span>
+      </div>
+      <pre class="config-content">${escapeHtml(JSON.stringify({
+        run_id: meta.run_id,
+        strategy_name: meta.strategy_name,
+        backtest_range: meta.backtest_range,
+        initial_capital: meta.initial_capital,
+        generated_at: meta.generated_at,
+        印花税合计: meta.stamp_tax_total,
+        券商佣金合计: meta.broker_commission_total,
+      }, null, 2))}</pre>
+    </div>`;
+
+  const cfgBlocks = (REPORT.strategy_config || []).map((cfg, i) => `
+    <div class="config-block">
+      <div class="config-header">
+        <span>${i+1}. ${cfg.name || ('Configuration ' + i)}</span>
+        <span class="config-arrow">▼</span>
+      </div>
+      <pre class="config-content">${escapeHtml(JSON.stringify(cfg, null, 2))}</pre>
+    </div>`).join('');
+
+  document.getElementById('tab-config').innerHTML = metaBlock + cfgBlocks;
+
+  document.querySelectorAll('#tab-config .config-header').forEach(h => {
+    h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ---------- Controls ---------- */
+function bindControls() {
+  bindTabs();
+
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const root = document.documentElement;
+    const cur = root.getAttribute('data-theme');
+    root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+    setTimeout(() => {
+      renderChartLegend();
+      renderMainChart();
+      renderHeatmap();
+      if (!document.getElementById('tab-substrats').hidden) renderSubChart();
+    }, 50);
+  });
+
+  document.querySelectorAll('#scale-toggle button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#scale-toggle button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      scaleMode = b.dataset.scale;
+      renderMainChart();
+    });
+  });
+
+  document.getElementById('reset-window').addEventListener('click', () => {
+    currentRange = [0, REPORT.timeseries.dates.length - 1];
+    renderKPIs();
+    renderHeatmap();
+    renderMainChart();
+  });
+
+  document.getElementById('screenshot-toggle').addEventListener('click', () => {
+    const enabled = document.body.classList.toggle('screenshot-mode');
+    document.getElementById('screenshot-toggle').textContent = enabled ? '截图模式：开' : '截图模式：关';
+    setTimeout(() => {
+      if (mainChart) mainChart.resize();
+      if (heatmap) heatmap.resize();
+      if (subChart) subChart.resize();
+    }, 40);
+  });
+
+  document.getElementById('export-btn').addEventListener('click', () => window.print());
+
+  window.addEventListener('resize', () => {
+    if (mainChart) mainChart.resize();
+    if (heatmap) heatmap.resize();
+    if (subChart) subChart.resize();
+  });
+}
+
+// =================== 个股择时 view 状态机 ===================
+const stockNav = (function () {
+  // 数据延迟读取：main() 是 async，IIFE 执行时 REPORT 尚未加载完成
+  function _data() { return window.__REPORT__ || {}; }
+  function _view() { return _data().daily_signal_view || { trade_dates: [], by_date: {}, strategies: [] }; }
+
+  const state = {
+    open: false,
+    date: null,        // 当前交易日 ISO
+    strategy: null,    // 当前 tab 选中策略
+  };
+  const l2 = document.getElementById('stock-modal-l2');
+
+  function show(el) { el.hidden = false; requestAnimationFrame(() => el.classList.add('active')); }
+  function hide(el) { el.classList.remove('active'); setTimeout(() => { el.hidden = true; }, 220); }
+
+  function open(date) {
+    const view = _view();
+    if (!view.trade_dates.length || !view.strategies.length) return;
+    if (!view.by_date[date]) {
+      toast(`无 ${date} 的信号数据`);
+      return;
+    }
+    if (!state.strategy || !view.strategies.includes(state.strategy)) {
+      state.strategy = view.strategies[0];
+    }
+    state.open = true;
+    state.date = date;
+    show(l2);
+    window.renderL2 && window.renderL2();
+  }
+
+  function close() {
+    if (!state.open) return;
+    state.open = false;
+    hide(l2);
+  }
+
+  function setDate(date) {
+    if (!_view().by_date[date]) return;
+    state.date = date;
+    window.renderL2 && window.renderL2();
+  }
+
+  function setStrategy(name) {
+    state.strategy = name;
+    window.renderL2 && window.renderL2();
+  }
+
+  function toast(msg) {
+    let t = document.querySelector('.stock-modal__toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.className = 'stock-modal__toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && state.open) close();
+  });
+  document.getElementById('l2-close').addEventListener('click', close);
+
+  return {
+    state, open, close, setDate, setStrategy, toast,
+    get data() { return _view(); },
+  };
+})();
+window.stockNav = stockNav;
+
+// =================== L2 渲染 ===================
+(function () {
+  function signalColor(v) {
+    const c = Math.max(0, Math.min(1, Number(v) || 0));
+    const r = Math.round(204 - (204 - 76) * c);
+    const g = Math.round(204 + (175 - 204) * c);
+    const b = Math.round(204 - (204 - 80) * c);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function fmtPct(v) { return (v * 100).toFixed(2) + '%'; }
+
+  function renderDateNav() {
+    const view = stockNav.data;
+    const dates = view.trade_dates;
+    const i = dates.indexOf(stockNav.state.date);
+    document.getElementById('l2-prev-date').disabled = i <= 0;
+    document.getElementById('l2-next-date').disabled = i < 0 || i >= dates.length - 1;
+
+    const snap = view.by_date[stockNav.state.date];
+    const tag = document.getElementById('l2-date-tag');
+    if (!snap) {
+      tag.hidden = true;
+    } else if (snap.is_rebalance) {
+      tag.hidden = false;
+      tag.textContent = '调仓日';
+      tag.className = 'stock-modal__date-tag';
+    } else if (snap.rebalance_anchor) {
+      tag.hidden = false;
+      tag.textContent = `沿用 ${snap.rebalance_anchor}`;
+      tag.className = 'stock-modal__date-tag stock-modal__date-tag--carry';
+    } else {
+      tag.hidden = true;
+    }
+  }
+
+  function renderTabs() {
+    const tabsEl = document.getElementById('l2-tabs');
+    tabsEl.innerHTML = '';
+    stockNav.data.strategies.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'stock-modal__tab' + (name === stockNav.state.strategy ? ' active' : '');
+      btn.textContent = name;
+      btn.addEventListener('click', () => stockNav.setStrategy(name));
+      tabsEl.appendChild(btn);
+    });
+  }
+
+  function renderPane() {
+    const paneEl = document.getElementById('l2-pane');
+    const snap = stockNav.data.by_date[stockNav.state.date];
+    if (!snap) {
+      paneEl.innerHTML = '<div class="stock-modal__empty">该交易日无信号数据</div>';
+      return;
+    }
+    const bucket = snap.by_strategy[stockNav.state.strategy];
+    const positions = (bucket && bucket.positions) || [];
+    if (!positions.length) {
+      paneEl.innerHTML = '<div class="stock-modal__empty">该策略当日无持仓</div>';
+      return;
+    }
+
+    const sorted = positions.slice().sort((a, b) => b.weight - a.weight);
+    const allHours = new Set();
+    sorted.forEach(p => (p.hourly_signals || []).forEach(s => allHours.add(s.hour)));
+    const hours = Array.from(allHours).sort();
+
+    const allEmpty = sorted.every(p => !(p.hourly_signals || []).length);
+    if (allEmpty) {
+      paneEl.innerHTML = '<div class="stock-modal__empty">该策略当日无信号数据</div>';
+      return;
+    }
+
+    const head = `<thead><tr>
+      <th>代码</th><th>名称</th><th>offset</th>
+      ${hours.map(h => `<th>${h}</th>`).join('')}
+    </tr></thead>`;
+
+    const rows = sorted.map(p => {
+      const sigMap = Object.fromEntries((p.hourly_signals || []).map(s => [s.hour, s.value]));
+      const sigCells = hours.map(h => {
+        const v = sigMap[h];
+        if (v === undefined || v === null) return '<td>—</td>';
+        return `<td><span class="stock-modal__signal-cell" style="background:${signalColor(v)}"></span>${Number(v).toFixed(2)}</td>`;
+      }).join('');
+      const titleAttr = `权重 ${fmtPct(p.weight / 100)}　买入 ${p.buy_date}　持仓 ${p.hold_days} 天`;
+      return `<tr title="${titleAttr}">
+        <td>${p.code}</td><td>${p.name || ''}</td><td>${p.offset}</td>
+        ${sigCells}
+      </tr>`;
+    }).join('');
+
+    paneEl.innerHTML = `<table class="stock-modal__table">${head}<tbody>${rows}</tbody></table>`;
+  }
+
+  window.renderL2 = function () {
+    document.getElementById('l2-crumb').textContent = `个股择时 · ${stockNav.state.date}`;
+    renderDateNav();
+    renderTabs();
+    renderPane();
+  };
+
+  document.getElementById('l2-prev-date').addEventListener('click', () => {
+    const dates = stockNav.data.trade_dates;
+    const i = dates.indexOf(stockNav.state.date);
+    if (i > 0) stockNav.setDate(dates[i - 1]);
+  });
+  document.getElementById('l2-next-date').addEventListener('click', () => {
+    const dates = stockNav.data.trade_dates;
+    const i = dates.indexOf(stockNav.state.date);
+    if (i >= 0 && i < dates.length - 1) stockNav.setDate(dates[i + 1]);
+  });
+})();
+</script>
+
+</body>
+</html>

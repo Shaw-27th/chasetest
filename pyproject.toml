@@ -1,0 +1,12 @@
+[build-system]
+requires = [
+    "setuptools>=68",
+    "wheel",
+    "Cython>=3.0,<4",
+    "numpy>=2.0,<2.1",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 120              # 每行最大字符数，默认 88
+skip-magic-trailing-comma = true  # 启用“魔法逗号”，多行时自动换行

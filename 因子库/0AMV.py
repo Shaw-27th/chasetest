@@ -1,0 +1,30 @@
+import pandas as pd
+
+# 财务因子列：此列表用于存储财务因子相关的列名称󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
+fin_cols = []  # 财务因子列，配置后系统会自动加载对应的财务数据󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
+
+
+def add_factor(df: pd.DataFrame, param=None, **kwargs) -> pd.DataFrame:
+    """
+    计算布林带位置z = (收盘价_复权 - N日均线) / N日标准差，只返回包含因子列的DataFrame。
+
+    :param df: 单只股票的日线数据，需包含 ``收盘价`` 列。
+    :param param: 预留的因子参数，当前计算不使用。
+    :param kwargs: 其他参数，其中 ``col_name`` 为输出因子列名。
+    :return: 只包含新因子列的 DataFrame，行数和索引与输入 df 一致。
+    """
+
+    # ======================== 参数处理 ===========================󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
+    # 从kwargs中提取因子列的名称，这里使用'col_name'来标识因子列名称󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
+    n = int(param)
+    col_name = kwargs["col_name"]
+
+    # ======================== 计算因子 ===========================󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
+    # 使用当日收盘价作为因子值󠀂󠁥󠀵󠁡󠁥󠀸󠀷󠀲󠀰󠀳󠀱󠀳󠀷󠀳󠀹󠀳󠀷󠀳󠀷󠀳󠀰󠁿
+    data = pd.read_excel(r'D:\stock_data\stock-0MVA-data-2026-08-09')
+    close= df["收盘价"]
+    ma = close.rolling(n, min_periods=n).mean()
+    # std = close.rolling(n, min_periods=n).std(ddof=0)
+
+    z = ma
+    return pd.DataFrame({col_name: z}, index=df.index)

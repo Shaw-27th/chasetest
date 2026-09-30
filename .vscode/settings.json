@@ -1,0 +1,15 @@
+{
+    "python.terminal.executeInFileDir": true,
+    "python.terminal.activateEnvironment": true,
+    "terminal.integrated.cwd": "${fileDirname}",
+    "terminal.integrated.env.osx": {
+        "PYTHONPATH": "${fileDirname}:${workspaceFolder}"
+    },
+    "terminal.integrated.env.windows": {
+        "PYTHONPATH": "${fileDirname};${workspaceFolder}"
+    },
+    "terminal.integrated.env.linux": {
+        "PYTHONPATH": "${fileDirname}:${workspaceFolder}"
+    },
+    "python-envs.defaultEnvManager": "ms-python.python:system"
+}
